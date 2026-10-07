@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: devops-incident-copilot-api
+    runtime: python
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt && python seed_data.py"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEFAULT_LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: POSTGRES_DIAGNOSTIC_DB_URL
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false
+      - key: RENDER_SERVICE_ID
+        sync: false
+      - key: VERCEL_API_TOKEN
+        sync: false
+      - key: VERCEL_PROJECT_ID
+        sync: false
+      - key: CHROMA_PERSIST_DIRECTORY
+        value: ./chroma_db

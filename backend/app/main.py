@@ -40,7 +40,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration supporting ports 5173 through 5176
+# CORS Configuration supporting development & production (Vercel, custom domains)
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5174",
@@ -50,13 +50,13 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5174",
     "http://127.0.0.1:5175",
     "http://127.0.0.1:5176",
+    "*"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):(517[3-6])",
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

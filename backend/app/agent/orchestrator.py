@@ -26,7 +26,8 @@ class IncidentOrchestrator:
         model_name: Optional[str] = None,
         enable_postgres: bool = True,
         enable_render: bool = True,
-        enable_vercel: bool = True
+        enable_vercel: bool = True,
+        target_url: Optional[str] = None
     ) -> Dict[str, Any]:
         start_time = time.time()
         timings = {}
@@ -56,13 +57,27 @@ class IncidentOrchestrator:
         telemetry_raw = await mcp_client.collect_telemetry(
             enable_postgres=enable_postgres,
             enable_render=enable_render,
-            enable_vercel=enable_vercel
+            enable_vercel=enable_vercel,
+            target_url=target_url
         )
         timings["telemetry_mcp_ms"] = round((time.time() - mcp_start) * 1000, 2)
 
         # Format Telemetry for LLM Context
         telemetry_blocks = []
         sources = telemetry_raw.get("sources", {})
+
+        if "website_probe" in sources:
+            probe = sources["website_probe"]
+            ssl_info = probe.get("ssl_info") or {}
+            telemetry_blocks.append(f"""
+[Live Website Edge Diagnostic Probe ({probe.get('target_url')})]
+- Online: {probe.get('online')} | Status Code: {probe.get('status_code')} ({probe.get('status_text')})
+- Response Latency / TTFB: {probe.get('latency_ms')} ms
+- SSL Health: Valid={ssl_info.get('valid')}, Days Remaining={ssl_info.get('days_remaining')}, Issuer={ssl_info.get('issuer_org')}
+- Key Headers: {probe.get('headers_summary')}
+- Diagnostic Signal: {probe.get('diagnostic_summary')}
+- Probe Error (if any): {probe.get('error_detail')}
+""")
 
         if "postgres" in sources:
             pg = sources["postgres"]
@@ -163,6 +178,7 @@ SELECT count(*), state FROM pg_stat_activity GROUP BY state;
         return {
             "status": "completed",
             "alert": alert_payload,
+            "target_url": target_url,
             "provider_used": provider or "gemini",
             "model_used": model_name or "gemini-1.5-pro",
             "triage_report": diagnosis_markdown,
@@ -170,5 +186,51 @@ SELECT count(*), state FROM pg_stat_activity GROUP BY state;
             "live_telemetry": telemetry_raw,
             "performance_timings": timings
         }
+
+    async def stream_triage(
+        self,
+        alert_payload: str,
+        provider: Optional[str] = None,
+        model_name: Optional[str] = None,
+        enable_postgres: bool = True,
+        enable_render: bool = True,
+        enable_vercel: bool = True,
+        target_url: Optional[str] = None
+    ):
+        """
+        Asynchronous generator emitting Server-Sent Events (SSE) representing
+        the step-by-step reasoning trace of the SRE Copilot loop.
+        """
+        import asyncio
+
+        yield f"event: step\ndata: {json.dumps({'phase': 'ingest', 'step_num': 1, 'message': 'Ingesting alert payload & sanitizing incident signals...'})}\n\n"
+        await asyncio.sleep(0.3)
+
+        yield f"event: step\ndata: {json.dumps({'phase': 'rag', 'step_num': 2, 'message': 'Querying ChromaDB Vector Store across 89+ curated SRE runbooks & postmortems...'})}\n\n"
+        rag_start = time.time()
+        retrieved_docs = vector_store.search(alert_payload, n_results=4)
+        rag_time = round((time.time() - rag_start) * 1000, 1)
+
+        doc_names = [d["metadata"].get("filename", "Runbook") for d in retrieved_docs[:2]]
+        yield f"event: step\ndata: {json.dumps({'phase': 'rag_done', 'step_num': 3, 'message': f'Retrieved {len(retrieved_docs)} relevant SOPs in {rag_time}ms: {', '.join(doc_names)}'})}\n\n"
+        await asyncio.sleep(0.3)
+
+        probe_msg = f" & probing target website {target_url}" if target_url else ""
+        yield f"event: step\ndata: {json.dumps({'phase': 'mcp', 'step_num': 4, 'message': f'Dispatching parallel MCP telemetry diagnostic collectors (Neon DB, Render, Vercel{probe_msg})...'})}\n\n"
+
+        result = await self.triage_incident(
+            alert_payload=alert_payload,
+            provider=provider,
+            model_name=model_name,
+            enable_postgres=enable_postgres,
+            enable_render=enable_render,
+            enable_vercel=enable_vercel,
+            target_url=target_url
+        )
+
+        yield f"event: step\ndata: {json.dumps({'phase': 'synthesis', 'step_num': 5, 'message': 'Synthesizing correlated SRE Incident Commander Root Cause Analysis via Google Gemini...'})}\n\n"
+        await asyncio.sleep(0.2)
+
+        yield f"event: complete\ndata: {json.dumps(result)}\n\n"
 
 orchestrator = IncidentOrchestrator()

@@ -15,12 +15,15 @@ An enterprise-grade, autonomous **DevOps Runbook & Live Incident Copilot** desig
 ## 🎯 Key Features
 
 - 🧠 **Header-Aware RAG Knowledge Base**: High-precision semantic chunking and cosine similarity search across 89+ curated SRE runbooks (SOPs) and authentic postmortems (PostHog, GitLab, Cloudflare, GitHub, Dan Luu).
-- 🔌 **Live MCP Infrastructure Diagnostics**: Real-time read-only inspection of:
-  - **Neon PostgreSQL**: Active transactions in `pg_stat_activity`, lock contention in `pg_locks`, and pooler saturation.
-  - **Render API**: Live backend logs and deploy statuses.
-  - **Vercel Edge API**: Deployment telemetry and edge runtime events.
+- ⚡ **Real-Time Streaming Chain-of-Thought (SSE)**: Live Server-Sent Events stream showing the AI's step-by-step reasoning progress and telemetry collection in an interactive terminal.
+- 🌐 **"Diagnose My Website" Live Edge Prober (User Method 1)**: Any user can input their website/API URL and error stack traces to get an instant edge network health probe (HTTP status, TTFB latency, SSL expiry, headers) correlated with AI SRE diagnosis.
+- 📡 **Public Inbound Alert Webhook (User Method 2)**: Integrated webhook endpoint (`/api/incidents/webhook`) ready for Sentry, Datadog, BetterStack, Cloudflare, or custom alert scripts to trigger automated SRE triage.
+- 💥 **Chaos Engineering Simulator Sandbox**: Built-in 1-click failure injection cards (PostgreSQL Lock Contention, Connection Pool Exhaustion, 504 Gateway Timeout, Memory Leak / OOM, SSL Expiry) for instant interactive demonstrations.
+- 🛡️ **Human-in-the-Loop (HITL) 1-Click Remediation**: Safe sandboxed remediation runner allowing SREs to approve and execute SQL/CLI fixes directly from the incident triage report.
+- 🔄 **Continuous Learning Knowledge Flywheel**: Automatically generates structured SRE postmortems on incident resolution and dynamically re-indexes them into ChromaDB.
+- 🔌 **Live MCP Infrastructure Diagnostics**: Real-time read-only inspection of **Neon PostgreSQL**, **Render API**, and **Vercel Edge API**.
 - 🔀 **Multi-Model Orchestrator**: Dynamic runtime switching between **Google Gemini** (`gemini-flash-latest`, `gemini-1.5-pro`) and local offline **Ollama** (`llama3.1`, `qwen2.5-coder`).
-- 🖥️ **SRE Operations Console**: Dark-mode React dashboard with 1-click incident presets, live infrastructure telemetry pills, and copyable remediation CLI/SQL command checklists.
+- 🖥️ **SRE Operations Console**: Dark-mode React dashboard with 5 specialized views, live telemetry pills, and copyable remediation checklists.
 
 ---
 

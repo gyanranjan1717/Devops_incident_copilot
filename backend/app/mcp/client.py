@@ -13,13 +13,15 @@ from typing import Dict, Any, List, Optional
 from app.mcp.postgres_tool import postgres_tool
 from app.mcp.render_logs_tool import render_logs_tool
 from app.mcp.vercel_logs_tool import vercel_logs_tool
+from app.mcp.website_prober import website_prober
 
 class MCPClientOrchestrator:
     async def collect_telemetry(
         self,
         enable_postgres: bool = True,
         enable_render: bool = True,
-        enable_vercel: bool = True
+        enable_vercel: bool = True,
+        target_url: Optional[str] = None
     ) -> Dict[str, Any]:
         """Collects telemetry concurrently from enabled MCP diagnostic sources."""
         loop = asyncio.get_event_loop()
@@ -35,6 +37,9 @@ class MCPClientOrchestrator:
         if enable_vercel:
             source_names.append("vercel")
             futures.append(loop.run_in_executor(None, vercel_logs_tool.fetch_recent_deployments))
+        if target_url:
+            source_names.append("website_probe")
+            futures.append(website_prober.probe_url(target_url))
 
         results_list = await asyncio.gather(*futures, return_exceptions=True)
         results = {}

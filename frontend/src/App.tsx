@@ -5,6 +5,10 @@ import { IncidentInput } from './components/IncidentInput';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { TriageReport } from './components/TriageReport';
 import { RunbookBrowser } from './components/RunbookBrowser';
+import { AgentTerminal, ReasoningStep } from './components/AgentTerminal';
+import { WebsiteInspector } from './components/WebsiteInspector';
+import { ChaosSimulator } from './components/ChaosSimulator';
+import { WebhookHub } from './components/WebhookHub';
 import {
   IncidentPreset,
   TriageResult,
@@ -13,13 +17,19 @@ import {
 } from './types';
 import {
   fetchIncidentPresets,
-  triageIncident,
+  streamTriageIncident,
   fetchLiveTelemetry,
   fetchModelsStatus,
   switchModel,
   fetchRunbooks
 } from './services/api';
-import { Terminal, Shield, BookOpen, Layers } from 'lucide-react';
+import {
+  Terminal,
+  Globe,
+  Flame,
+  Webhook,
+  BookOpen
+} from 'lucide-react';
 
 export const App: React.FC = () => {
   const [modelsStatus, setModelsStatus] = useState<ModelsStatus | null>(null);
@@ -36,11 +46,14 @@ export const App: React.FC = () => {
   const [enableVercel, setEnableVercel] = useState<boolean>(true);
 
   // UI state
-  const [activeView, setActiveView] = useState<'triage' | 'knowledge'>('triage');
+  const [activeView, setActiveView] = useState<'triage' | 'website' | 'webhook' | 'chaos' | 'knowledge'>('triage');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isTelemetryLoading, setIsTelemetryLoading] = useState<boolean>(false);
   const [triageResult, setTriageResult] = useState<TriageResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
+
+  // Agent Streaming State
+  const [reasoningSteps, setReasoningSteps] = useState<ReasoningStep[]>([]);
 
   // Initial Data Fetch
   useEffect(() => {
@@ -119,25 +132,33 @@ export const App: React.FC = () => {
     if (!alertText.trim()) return;
     setIsLoading(true);
     setErrorMsg('');
+    setReasoningSteps([]);
+    setTriageResult(null);
 
-    try {
-      const result = await triageIncident({
+    await streamTriageIncident(
+      {
         alert_payload: alertText,
         provider: selectedProvider,
         model_name: selectedModel,
         enable_postgres: enablePostgres,
         enable_render: enableRender,
         enable_vercel: enableVercel,
-      });
-      setTriageResult(result);
-      if (result.live_telemetry) {
-        setTelemetry(result.live_telemetry);
+      },
+      (step) => {
+        setReasoningSteps((prev) => [...prev, step]);
+      },
+      (result) => {
+        setTriageResult(result);
+        if (result.live_telemetry) {
+          setTelemetry(result.live_telemetry);
+        }
+        setIsLoading(false);
+      },
+      (err) => {
+        setErrorMsg(err || 'Incident triage streaming failed');
+        setIsLoading(false);
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Incident triage failed');
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
 
   return (
@@ -149,30 +170,67 @@ export const App: React.FC = () => {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
-        {/* Navigation Tabs */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex items-center gap-2">
+        {/* Navigation Tabs Bar */}
+        <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-2 gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => setActiveView('triage')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                 activeView === 'triage'
                   ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              <Terminal className="w-4 h-4" />
-              Live Incident Triage & Telemetry
+              <Terminal className="w-3.5 h-3.5 text-sky-400" />
+              Live Incident Triage
             </button>
+
             <button
-              onClick={() => setActiveView('knowledge')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all ${
-                activeView === 'knowledge'
-                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+              onClick={() => setActiveView('website')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === 'website'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              <BookOpen className="w-4 h-4" />
-              Runbook & Postmortem Knowledge Base ({totalChunks} Chunks)
+              <Globe className="w-3.5 h-3.5 text-emerald-400" />
+              Diagnose My Website
+            </button>
+
+            <button
+              onClick={() => setActiveView('webhook')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === 'webhook'
+                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <Webhook className="w-3.5 h-3.5 text-indigo-400" />
+              Inbound Webhook
+            </button>
+
+            <button
+              onClick={() => setActiveView('chaos')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === 'chaos'
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5 text-rose-400" />
+              Chaos Sandbox
+            </button>
+
+            <button
+              onClick={() => setActiveView('knowledge')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeView === 'knowledge'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+              Knowledge Base ({totalChunks})
             </button>
           </div>
         </div>
@@ -183,10 +241,9 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* View 1: Triage Dashboard */}
+        {/* View 1: Main Triage Dashboard with Streaming Terminal */}
         {activeView === 'triage' && (
           <div className="flex flex-col gap-6">
-            {/* Model & Source Configuration Bar */}
             <ModelSelector
               status={modelsStatus}
               selectedProvider={selectedProvider}
@@ -223,16 +280,43 @@ export const App: React.FC = () => {
               </div>
             </div>
 
+            {/* Live Streaming Agent Reasoning Terminal (SSE) */}
+            <AgentTerminal steps={reasoningSteps} isActive={isLoading} />
+
             {/* SRE Triage Report Output */}
             {triageResult && (
               <div className="mt-2">
-                <TriageReport result={triageResult} />
+                <TriageReport
+                  result={triageResult}
+                  onPostmortemAdded={(newTotal) => setTotalChunks(newTotal)}
+                />
               </div>
             )}
           </div>
         )}
 
-        {/* View 2: Knowledge Base Browser */}
+        {/* View 2: User Method 1 - Website & API Prober */}
+        {activeView === 'website' && (
+          <div>
+            <WebsiteInspector />
+          </div>
+        )}
+
+        {/* View 3: User Method 2 - Inbound Webhook Automation */}
+        {activeView === 'webhook' && (
+          <div>
+            <WebhookHub />
+          </div>
+        )}
+
+        {/* View 4: Chaos Engineering Simulator */}
+        {activeView === 'chaos' && (
+          <div>
+            <ChaosSimulator />
+          </div>
+        )}
+
+        {/* View 5: Knowledge Base Browser */}
         {activeView === 'knowledge' && (
           <div>
             <RunbookBrowser />
@@ -241,7 +325,7 @@ export const App: React.FC = () => {
       </main>
 
       <footer className="border-t border-slate-900 py-4 text-center text-xs font-mono text-slate-500">
-        DevOps Incident Copilot &bull; Autonomous RAG + MCP Architecture &bull; Powered by Google Gemini &amp; Neon PostgreSQL
+        DevOps Incident Copilot &bull; Autonomous RAG + MCP Architecture &bull; Powered by Google Gemini, Neon PostgreSQL, Render &amp; Vercel
       </footer>
     </div>
   );
