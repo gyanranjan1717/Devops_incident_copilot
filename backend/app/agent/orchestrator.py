@@ -212,7 +212,9 @@ SELECT count(*), state FROM pg_stat_activity GROUP BY state;
         rag_time = round((time.time() - rag_start) * 1000, 1)
 
         doc_names = [d["metadata"].get("filename", "Runbook") for d in retrieved_docs[:2]]
-        yield f"event: step\ndata: {json.dumps({'phase': 'rag_done', 'step_num': 3, 'message': f'Retrieved {len(retrieved_docs)} relevant SOPs in {rag_time}ms: {', '.join(doc_names)}'})}\n\n"
+        doc_names_str = ", ".join(doc_names)
+        msg_str = f"Retrieved {len(retrieved_docs)} relevant SOPs in {rag_time}ms: {doc_names_str}"
+        yield f"event: step\ndata: {json.dumps({'phase': 'rag_done', 'step_num': 3, 'message': msg_str})}\n\n"
         await asyncio.sleep(0.3)
 
         probe_msg = f" & probing target website {target_url}" if target_url else ""
