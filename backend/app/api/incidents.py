@@ -108,16 +108,22 @@ CHAOS_SCENARIOS = {
         "title": "PostgreSQL AccessExclusiveLock Contention",
         "category": "Database Contention",
         "severity": "P1",
-        "description": "Simulates an unindexed DDL table migration locking rows and stalling 45 active transactions.",
+        "description": "An unindexed DDL table migration locks the 'orders' table, freezing 38 active transactions.",
+        "problem_statement": "A long-running background schema migration (ALTER TABLE) acquired an AccessExclusiveLock on the 'orders' table. Every subsequent customer checkout query was forced into waiting state, rapidly consuming 98% of all available database connections.",
+        "impact": "100% of checkout API requests timing out (>12s). Active client transactions frozen in 'idle in transaction' state. Potential risk of entire database restart if cascading locks are not resolved.",
+        "target_resolution": "Identify the blocking transaction PID (89412) via pg_stat_activity, safely terminate the blocker with pg_terminate_backend, verify downstream queries unblock, and prevent connection starvation.",
         "payload": """[FATAL] Postgres lock contention: Transaction PID 89412 holding AccessExclusiveLock on relation 'orders'.
 38 downstream queries waiting on lock. Client queue latency spiked from 14ms to 12,800ms.
 Active connections: 98/100. Connection pool status: SATURATED."""
     },
     "pool_exhaustion": {
-        "title": "Database Connection Pool Saturation",
+        "title": "Database Connection Pool Saturation (100%)",
         "category": "Connection Pool Exhaustion",
         "severity": "P1",
-        "description": "Simulates leaking database sessions exhausting the max connection pool.",
+        "description": "Leaked database sessions exhaust the 100-connection limit, causing FATAL connection rejection.",
+        "problem_statement": "An asynchronous worker service opened DB sessions without closing them in a finally block. Within 8 minutes, all 100 connection slots in the PostgreSQL pool were exhausted, leaving 44 sessions 'idle in transaction' and 184 client threads stalled.",
+        "impact": "psycopg2 throws 'FATAL: remaining connection slots are reserved for non-replication superuser connections'. No new user can log in or save data.",
+        "target_resolution": "Identify leaked idle sessions, terminate orphan connections holding pool slots, and tune pool max_overflow and pool_timeout settings according to SOP.",
         "payload": """psycopg2.OperationalError: FATAL: remaining connection slots are reserved for non-replication superuser connections.
 Active connections: 100/100. Idle in transaction: 44. Client threads waiting: 184."""
     },
@@ -125,7 +131,10 @@ Active connections: 100/100. Idle in transaction: 44. Client threads waiting: 18
         "title": "504 Gateway Timeout Cascade",
         "category": "Ingress Timeout",
         "severity": "P1",
-        "description": "Simulates downstream HTTP 504 timeouts and upstream worker starvation.",
+        "description": "Upstream microservice unresponsive, triggering Nginx 504 timeouts across the payments API.",
+        "problem_statement": "The downstream /api/v2/payments service is waiting on an external payment provider that is experiencing packet loss. Because request timeouts were configured too high, all Nginx ingress proxy workers got tied up waiting on TCP sockets.",
+        "impact": "31.4% of all ingress requests over the last 3-minute window failed with HTTP 504 Gateway Timeout. User transactions failing at the final confirmation step.",
+        "target_resolution": "Inspect ingress upstream logs, adjust proxy read timeouts, enable circuit breaking for the payment provider, and perform a rolling restart on stalled upstream workers.",
         "payload": """[CRITICAL] Nginx Ingress: 504 Gateway Timeout spike on endpoint /api/v2/payments.
 504 rate: 31.4% of total requests over 3m window. Upstream socket timeout (110: Connection timed out)."""
     },
@@ -133,7 +142,10 @@ Active connections: 100/100. Idle in transaction: 44. Client threads waiting: 18
         "title": "Container Heap Saturation & SIGKILL OOM",
         "category": "Resource Exhaustion",
         "severity": "P2",
-        "description": "Simulates worker heap memory leak causing Linux kernel OOM-killer SIGKILL 137.",
+        "description": "Node.js / Python memory leak triggers Linux kernel OOM-killer (exit code 137).",
+        "problem_statement": "A newly deployed caching feature kept unbounded in-memory maps without an eviction policy. Resident set size (RSS) grew from 250MB to 1980MB, hitting the container cgroup limit and prompting the Linux kernel to send SIGKILL 137.",
+        "impact": "Worker crashed 5 times within 10 minutes. During worker crash-restart loops, in-flight API requests are dropped with connection resets.",
+        "target_resolution": "Examine kernel OOM log timestamps, increase container memory ceiling temporarily, rollback memory-leaking commit, and enforce LRU cache limits.",
         "payload": """kernel: [41928.192] Out of memory: Killed process 412 (uvicorn worker) total-vm:2048MB, anon-rss:1980MB, file-rss:0kB.
 Service restarted 5 times in the last 10 minutes. Container exit code 137."""
     },
@@ -141,7 +153,10 @@ Service restarted 5 times in the last 10 minutes. Container exit code 137."""
         "title": "SSL/TLS Handshake Expiration",
         "category": "Security / Networking",
         "severity": "P2",
-        "description": "Simulates invalid or expired SSL edge certificates rejecting client traffic.",
+        "description": "Edge TLS certificate expired, causing browsers and curl clients to abort handshakes.",
+        "problem_statement": "The automated certbot / Let's Encrypt renewal cron job failed due to an DNS challenge authorization mismatch. The edge SSL certificate expired at 00:00 UTC, causing all HTTPS handshakes to fail immediately.",
+        "impact": "100% of user browsers show 'Your connection is not private / NET::ERR_CERT_DATE_INVALID'. Total traffic drop to zero on secure edge routes.",
+        "target_resolution": "Trigger immediate manual DNS ACME challenge renewal or swap to wildcard edge certificate, reload ingress proxy, and verify handshake via curl -Iv.",
         "payload": """curl: (60) SSL certificate problem: certificate has expired.
 Edge router error: SSL_do_handshake() failed (SSL: error:0A000086:SSL routines::certificate verify failed).
 Traffic drop: 100% of HTTPS edge requests terminating at ingress."""
