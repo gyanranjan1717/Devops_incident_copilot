@@ -66,6 +66,17 @@ def search_knowledge_base(
         "results": results
     }
 
+@router.get("/chunks")
+def list_all_chunks():
+    """Lists all individual indexed vector chunks across all runbooks and postmortems."""
+    chunks = vector_store.get_all_chunks()
+    stats = vector_store.get_stats()
+    return {
+        "count": len(chunks),
+        "chunks": chunks,
+        "vector_store_stats": stats
+    }
+
 @router.get("/{filename}")
 def get_document_content(filename: str):
     """Returns the raw markdown content of a specific runbook or postmortem."""

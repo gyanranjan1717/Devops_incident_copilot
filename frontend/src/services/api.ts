@@ -236,6 +236,16 @@ export async function fetchRunbooks(docType?: string): Promise<{
   return resp.json();
 }
 
+export async function fetchRunbookChunks(): Promise<{
+  count: number;
+  chunks: import('../types').VectorChunk[];
+  vector_store_stats: any;
+}> {
+  const resp = await fetch(`${API_BASE}/runbooks/chunks`);
+  if (!resp.ok) throw new Error('Failed to fetch vector chunks');
+  return resp.json();
+}
+
 export async function fetchRunbookDetail(filename: string): Promise<{
   filename: string;
   title: string;

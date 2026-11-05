@@ -49,6 +49,21 @@ backend/logs/
 # IDE & OS files
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
+
+# Generator & compilation temp scripts
+build_*.py
+compile_*.py
+generate_*.py
+extra_*.py
+*part1.json
+enrich_data.py
+all_questions_data.py
+make_data.py
+template*.py
+
+.idea/
 *.swp
 *.swo
 .DS_Store

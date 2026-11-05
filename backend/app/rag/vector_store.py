@@ -129,6 +129,29 @@ class VectorStoreManager:
             "collection_name": settings.CHROMA_COLLECTION_NAME
         }
 
+    def get_all_chunks(self) -> List[Dict[str, Any]]:
+        """Returns all indexed vector chunks with id, text snippet, and metadata."""
+        count = self.collection.count()
+        if count == 0:
+            return []
+        
+        data = self.collection.get(include=["metadatas", "documents"])
+        chunks = []
+        ids = data.get("ids", [])
+        docs = data.get("documents", [])
+        metas = data.get("metadatas", [])
+        
+        for chunk_id, doc_text, meta in zip(ids, docs, metas):
+            chunks.append({
+                "id": chunk_id,
+                "text": doc_text,
+                "metadata": meta or {}
+            })
+            
+        # Sort chunks alphabetically by id so chunks from the same file stay grouped
+        chunks.sort(key=lambda x: x["id"])
+        return chunks
+
     def reset_collection(self):
         """Clears all records from the collection."""
         self.client.delete_collection(settings.CHROMA_COLLECTION_NAME)

@@ -132,6 +132,18 @@ export interface RunbookDocument {
   size_bytes: number;
 }
 
+export interface VectorChunk {
+  id: string;
+  text: string;
+  metadata: {
+    filename?: string;
+    title?: string;
+    type?: string;
+    section?: string;
+    tags?: string;
+  };
+}
+
 export interface ModelsStatus {
   current_provider: string;
   current_model: string;
